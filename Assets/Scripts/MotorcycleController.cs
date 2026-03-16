@@ -27,6 +27,9 @@ public class MotorcycleController : MonoBehaviour
     [SerializeField] TMP_Text speedText;
     int speed = 0;
 
+    [Header("GAME FLOW")]
+    [SerializeField] GameManager gameManager;
+
     ///////////////////////
     [Header("TILTING")]
     [SerializeField] float tiltingSpeed;
@@ -49,6 +52,8 @@ public class MotorcycleController : MonoBehaviour
     void Start()
     {
         motorcycleRigidbody = GetComponent<Rigidbody>();
+        if (gameManager == null)
+            gameManager = GameManager.Instance;
         //
         BikerRigidbodiesKinematicSituation(true);
         BikerCollidersEnabledSituation(false);
@@ -72,6 +77,12 @@ public class MotorcycleController : MonoBehaviour
     //Movement
     void VerticalMove()
     {
+        if (!IsInRidingState())
+        {
+            frontWheelCollider.motorTorque = 0f;
+            return;
+        }
+
         float verticalInput = Input.GetAxis("Vertical");
         frontWheelCollider.motorTorque = verticalInput * movePower;
         //
@@ -97,6 +108,13 @@ public class MotorcycleController : MonoBehaviour
 
     void HorizontalMove()
     {
+        if (!IsInRidingState())
+        {
+            currentSteerRotateAngle = 0f;
+            frontWheelCollider.steerAngle = 0f;
+            return;
+        }
+
         float horizontalInput = Input.GetAxis("Horizontal");
         currentSteerRotateAngle = maxSteerRotateAngle * horizontalInput;
         frontWheelCollider.steerAngle = currentSteerRotateAngle;
@@ -124,6 +142,14 @@ public class MotorcycleController : MonoBehaviour
     // Control Put On The Brake
     void CheckPutBrake()
     {
+        if (!IsInRidingState())
+        {
+            isBraking = false;
+            currentBrakePower = 0f;
+            frontWheelCollider.brakeTorque = 0f;
+            return;
+        }
+
         isBraking = Input.GetKey(KeyCode.Space);
         currentBrakePower = isBraking ? brakePower : 0f;
         frontWheelCollider.brakeTorque = currentBrakePower;
@@ -256,9 +282,17 @@ public class MotorcycleController : MonoBehaviour
     {
         if(other.gameObject.CompareTag("Obstacle"))
         {
+            if (gameManager != null)
+                gameManager.OnCrashTriggered();
+
             BikerRigidbodiesKinematicSituation(false);
             BikerCollidersEnabledSituation(true);
         }
+    }
+
+    bool IsInRidingState()
+    {
+        return gameManager == null || gameManager.CurrentState == GameState.Riding;
     }
 
 }
