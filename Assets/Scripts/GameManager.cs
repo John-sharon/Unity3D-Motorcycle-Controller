@@ -17,6 +17,8 @@ public class GameManager : MonoBehaviour
 
     public event Action<GameState, GameState> OnStateChanged;
 
+    [SerializeField] RunManager runManager;
+
     public GameState CurrentState { get; private set; } = GameState.PreRun;
 
     void Awake()
@@ -28,6 +30,9 @@ public class GameManager : MonoBehaviour
         }
 
         Instance = this;
+
+        if (runManager == null)
+            runManager = FindObjectOfType<RunManager>();
     }
 
     public bool SetState(GameState nextState)
@@ -37,6 +42,7 @@ public class GameManager : MonoBehaviour
 
         GameState previousState = CurrentState;
         CurrentState = nextState;
+        HandleRunStateTransition(previousState, CurrentState);
         OnStateChanged?.Invoke(previousState, CurrentState);
         return true;
     }
@@ -97,5 +103,23 @@ public class GameManager : MonoBehaviour
             default:
                 return false;
         }
+    }
+
+    void HandleRunStateTransition(GameState previousState, GameState nextState)
+    {
+        if (runManager == null)
+            return;
+
+        if (nextState == GameState.Riding)
+        {
+            runManager.BeginRun();
+            return;
+        }
+
+        if (nextState != GameState.RunComplete && nextState != GameState.GameOver)
+            return;
+
+        bool dodgedFallingBike = previousState == GameState.DodgingFallingBike && nextState == GameState.RunComplete;
+        runManager.EndRun(dodgedFallingBike);
     }
 }
