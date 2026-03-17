@@ -1,26 +1,50 @@
 using System.Collections;
-using UnityEngine;
 using TMPro;
+using UnityEngine;
 
 public class MotorcycleController : MonoBehaviour
 {
-    ///////////////////////
+    [System.Serializable]
+    public struct RuntimeBikeStats
+    {
+        public float movePower;
+        public float brakePower;
+        public float inNeutralBrakePower;
+        public float maxSteerRotateAngle;
+        public float tiltingSpeed;
+
+        public static RuntimeBikeStats FromBase(BikeStats bikeStats)
+        {
+            RuntimeBikeStats runtimeStats = default;
+            if (bikeStats == null)
+                return runtimeStats;
+
+            runtimeStats.movePower = bikeStats.movePower;
+            runtimeStats.brakePower = bikeStats.brakePower;
+            runtimeStats.inNeutralBrakePower = bikeStats.inNeutralBrakePower;
+            runtimeStats.maxSteerRotateAngle = bikeStats.maxSteerRotateAngle;
+            runtimeStats.tiltingSpeed = bikeStats.tiltingSpeed;
+            return runtimeStats;
+        }
+    }
+
     Rigidbody motorcycleRigidbody;
 
-    ///////////////////////
     [Header("MOTORCYCLE VALUES")]
     [SerializeField] WheelCollider frontWheelCollider;
     [SerializeField] Transform[] SteeringPiecesTransforms;
-    [SerializeField] float movePower;
-    [SerializeField] float brakePower;
-    [SerializeField] float inNeutralBrakePower;
-    [SerializeField] float maxSteerRotateAngle;
-    //
+    [SerializeField] BikeStats defaultStats;
+
+    float movePower;
+    float brakePower;
+    float inNeutralBrakePower;
+    float maxSteerRotateAngle;
+    float tiltingSpeed;
+
     float currentSteerRotateAngle;
     bool isBraking;
     float currentBrakePower;
 
-    ///////////////////////
     [Header("SPEED TEXT")]
     [SerializeField] TMP_Text speedText;
     int speed = 0;
@@ -28,21 +52,16 @@ public class MotorcycleController : MonoBehaviour
     [Header("GAME FLOW")]
     [SerializeField] GameManager gameManager;
 
-    ///////////////////////
-    [Header("TILTING")]
-    [SerializeField] float tiltingSpeed;
     float speedDetector;
     float slideValue;
     bool canMoveToFront = true;
 
-    ///////////////////////
     [Header("BIKER")]
     [SerializeField] RiderFallController riderFallController;
     [SerializeField] float followArmSpeed;
     [SerializeField] Transform rightArmTransform;
     [SerializeField] Transform leftArmTransform;
 
-    ///////////////////////
     bool isMovingSoundPlaying = false;
     bool isInNeutralSoundPlaying = false;
     bool isbrakingSoundPlaying = false;
@@ -54,6 +73,8 @@ public class MotorcycleController : MonoBehaviour
             gameManager = GameManager.Instance;
         if (riderFallController == null)
             riderFallController = GetComponentInChildren<RiderFallController>();
+
+        ApplyStats(RuntimeBikeStats.FromBase(defaultStats));
     }
 
     void Update()
@@ -70,8 +91,15 @@ public class MotorcycleController : MonoBehaviour
         TiltingToMotorcycle();
     }
 
-    ///////////////////////
-    //Movement
+    public void ApplyStats(RuntimeBikeStats stats)
+    {
+        movePower = Mathf.Max(0f, stats.movePower);
+        brakePower = Mathf.Max(0f, stats.brakePower);
+        inNeutralBrakePower = Mathf.Max(0f, stats.inNeutralBrakePower);
+        maxSteerRotateAngle = Mathf.Max(0f, stats.maxSteerRotateAngle);
+        tiltingSpeed = Mathf.Max(0f, stats.tiltingSpeed);
+    }
+
     void VerticalMove()
     {
         if (!IsInRidingState())
@@ -82,8 +110,7 @@ public class MotorcycleController : MonoBehaviour
 
         float verticalInput = Input.GetAxis("Vertical");
         frontWheelCollider.motorTorque = verticalInput * movePower;
-        //
-        if(verticalInput > 0 && canMoveToFront)
+        if (verticalInput > 0 && canMoveToFront)
         {
             SetMotorcycleMovingSound();
             MakeSlideOnMotorcycle();
@@ -115,7 +142,6 @@ public class MotorcycleController : MonoBehaviour
         float horizontalInput = Input.GetAxis("Horizontal");
         currentSteerRotateAngle = maxSteerRotateAngle * horizontalInput;
         frontWheelCollider.steerAngle = currentSteerRotateAngle;
-        //
         if (horizontalInput > 0.3f)
             FollowBikerArmsToSteeringWhenTurnRight();
         else if (horizontalInput < -0.3f)
@@ -124,19 +150,14 @@ public class MotorcycleController : MonoBehaviour
             FollowBikerArmsToSteeringWhenNoTurn();
     }
 
-    ///////////////////////
-    // Tilting To Motorcycle
     void TiltingToMotorcycle()
     {
         float zPosition = frontWheelCollider.steerAngle;
         zPosition = Mathf.Clamp(zPosition, -25, 25);
-        //
         Quaternion newMotorcycleRotation = Quaternion.Euler(new Vector3(0f, transform.eulerAngles.y, -zPosition));
         transform.rotation = Quaternion.Lerp(transform.rotation, newMotorcycleRotation, tiltingSpeed * Time.fixedDeltaTime);
     }
 
-    ///////////////////////
-    // Control Put On The Brake
     void CheckPutBrake()
     {
         if (!IsInRidingState())
@@ -156,14 +177,11 @@ public class MotorcycleController : MonoBehaviour
             isbrakingSoundPlaying = false;
     }
 
-    ///////////////////////
-    // Slide
     void MakeSlideOnMotorcycle()
     {
         speedDetector = motorcycleRigidbody.velocity.sqrMagnitude;
-        //
         slideValue = Vector3.Dot(motorcycleRigidbody.velocity.normalized, transform.forward);
-        if (slideValue > 0 && slideValue < 0.7f && speedDetector>20f)
+        if (slideValue > 0 && slideValue < 0.7f && speedDetector > 20f)
         {
             motorcycleRigidbody.velocity = Vector3.zero;
             SetMotorcycleBrakingSound();
@@ -179,21 +197,16 @@ public class MotorcycleController : MonoBehaviour
         canMoveToFront = true;
     }
 
-    ///////////////////////
-    // Follow Components To Each Other
     void FollowAllSteeringPieceToWheelRotation()
     {
         foreach (Transform piece in SteeringPiecesTransforms)
-        {
             piece.localEulerAngles = new Vector3(piece.localEulerAngles.x, frontWheelCollider.steerAngle, piece.localEulerAngles.z);
-        }
     }
 
     void FollowBikerArmsToSteeringWhenTurnRight()
     {
         Quaternion newRightArmRotation = Quaternion.Euler(new Vector3(138f, 91f, 60f));
         rightArmTransform.localRotation = Quaternion.Lerp(rightArmTransform.localRotation, newRightArmRotation, followArmSpeed * Time.fixedDeltaTime);
-        //
         Quaternion newLeftArmRotation = Quaternion.Euler(new Vector3(90f, -51f, 0f));
         leftArmTransform.localRotation = Quaternion.Lerp(leftArmTransform.localRotation, newLeftArmRotation, followArmSpeed * Time.fixedDeltaTime);
     }
@@ -202,7 +215,6 @@ public class MotorcycleController : MonoBehaviour
     {
         Quaternion newRightArmRotation = Quaternion.Euler(new Vector3(78f, 91f, 60f));
         rightArmTransform.localRotation = Quaternion.Lerp(rightArmTransform.localRotation, newRightArmRotation, followArmSpeed * Time.fixedDeltaTime);
-        //
         Quaternion newLeftArmRotation = Quaternion.Euler(new Vector3(106f, -51f, 0f));
         leftArmTransform.localRotation = Quaternion.Lerp(leftArmTransform.localRotation, newLeftArmRotation, followArmSpeed * Time.fixedDeltaTime);
     }
@@ -211,21 +223,16 @@ public class MotorcycleController : MonoBehaviour
     {
         Quaternion newRightArmRotation = Quaternion.Euler(new Vector3(103f, 91f, 60f));
         rightArmTransform.localRotation = Quaternion.Lerp(rightArmTransform.localRotation, newRightArmRotation, followArmSpeed * Time.fixedDeltaTime);
-        //
         Quaternion newLeftArmRotation = Quaternion.Euler(new Vector3(96f, -51f, 0f));
         leftArmTransform.localRotation = Quaternion.Lerp(leftArmTransform.localRotation, newLeftArmRotation, followArmSpeed * Time.fixedDeltaTime);
     }
 
-    ///////////////////////
-    // Display Motorcycle Speed
     void DisplayMotorcycleSpeedText()
     {
         speed = Mathf.RoundToInt(motorcycleRigidbody.velocity.magnitude * 3.6f);
         speedText.text = speed.ToString();
     }
 
-    ///////////////////////
-    // Sounds
     void SetMotorcycleMovingSound()
     {
         if (!isMovingSoundPlaying)
@@ -257,10 +264,10 @@ public class MotorcycleController : MonoBehaviour
             isMovingSoundPlaying = false;
         }
     }
-    ///////////////////////
+
     void OnCollisionEnter(Collision other)
     {
-        if(other.gameObject.CompareTag("Obstacle"))
+        if (other.gameObject.CompareTag("Obstacle"))
         {
             if (gameManager != null)
                 gameManager.OnCrashTriggered();
@@ -274,5 +281,4 @@ public class MotorcycleController : MonoBehaviour
     {
         return gameManager == null || gameManager.CurrentState == GameState.Riding;
     }
-
 }
