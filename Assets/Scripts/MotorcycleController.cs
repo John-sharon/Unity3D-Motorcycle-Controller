@@ -1,6 +1,4 @@
-﻿using System;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
@@ -39,7 +37,7 @@ public class MotorcycleController : MonoBehaviour
 
     ///////////////////////
     [Header("BIKER")]
-    [SerializeField] GameObject bikerParentGameObject;
+    [SerializeField] RiderFallController riderFallController;
     [SerializeField] float followArmSpeed;
     [SerializeField] Transform rightArmTransform;
     [SerializeField] Transform leftArmTransform;
@@ -54,9 +52,8 @@ public class MotorcycleController : MonoBehaviour
         motorcycleRigidbody = GetComponent<Rigidbody>();
         if (gameManager == null)
             gameManager = GameManager.Instance;
-        //
-        BikerRigidbodiesKinematicSituation(true);
-        BikerCollidersEnabledSituation(false);
+        if (riderFallController == null)
+            riderFallController = GetComponentInChildren<RiderFallController>();
     }
 
     void Update()
@@ -261,23 +258,6 @@ public class MotorcycleController : MonoBehaviour
         }
     }
     ///////////////////////
-    // Ragdoll
-    void BikerRigidbodiesKinematicSituation(bool isRigidbodiesKinematicActive)
-    {
-        Rigidbody[] bikerRigidbodies;
-        bikerRigidbodies = bikerParentGameObject.GetComponentsInChildren<Rigidbody>();
-        Array.ForEach(bikerRigidbodies, rb => rb.isKinematic = isRigidbodiesKinematicActive);
-        bikerRigidbodies[0].AddForce(transform.forward, ForceMode.Impulse);
-    }
-
-    void BikerCollidersEnabledSituation(bool isCollidersActive)
-    {
-        Collider[] bikerColliders;
-        bikerColliders = bikerParentGameObject.GetComponentsInChildren<Collider>();
-        Array.ForEach(bikerColliders, coll => coll.enabled = isCollidersActive);
-    }
-
-    ///////////////////////
     void OnCollisionEnter(Collision other)
     {
         if(other.gameObject.CompareTag("Obstacle"))
@@ -285,8 +265,8 @@ public class MotorcycleController : MonoBehaviour
             if (gameManager != null)
                 gameManager.OnCrashTriggered();
 
-            BikerRigidbodiesKinematicSituation(false);
-            BikerCollidersEnabledSituation(true);
+            if (riderFallController != null)
+                riderFallController.BeginEjection();
         }
     }
 
