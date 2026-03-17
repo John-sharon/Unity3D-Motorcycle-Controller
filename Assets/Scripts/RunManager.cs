@@ -46,6 +46,8 @@ public class RunManager : MonoBehaviour
     {
         if (trackedTransform == null)
             trackedTransform = transform;
+
+        BestDistance = SaveSystem.LoadBestDistance();
     }
 
     void Update()
@@ -63,6 +65,7 @@ public class RunManager : MonoBehaviour
 
         runStartPosition = trackedTransform.position;
         CurrentRunDistance = 0f;
+        LastRunReward = 0;
         isRunActive = true;
     }
 

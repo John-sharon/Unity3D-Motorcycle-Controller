@@ -18,8 +18,11 @@ public class GameManager : MonoBehaviour
     public event Action<GameState, GameState> OnStateChanged;
 
     [SerializeField] RunManager runManager;
+    [SerializeField] EconomyManager economyManager;
 
     public GameState CurrentState { get; private set; } = GameState.PreRun;
+
+    bool hasPendingRunRewards;
 
     void Awake()
     {
@@ -33,6 +36,9 @@ public class GameManager : MonoBehaviour
 
         if (runManager == null)
             runManager = FindObjectOfType<RunManager>();
+
+        if (economyManager == null)
+            economyManager = FindObjectOfType<EconomyManager>();
     }
 
     public bool SetState(GameState nextState)
@@ -72,7 +78,23 @@ public class GameManager : MonoBehaviour
 
     public void EndRun()
     {
-        SetState(GameState.RunComplete);
+        if (CurrentState != GameState.RunComplete && CurrentState != GameState.GameOver)
+            SetState(GameState.RunComplete);
+
+        if (!hasPendingRunRewards || runManager == null)
+            return;
+
+        if (economyManager == null)
+            economyManager = EconomyManager.Instance;
+
+        if (economyManager != null)
+            economyManager.AddCurrency(runManager.LastRunReward);
+
+        float bestDistance = Mathf.Max(runManager.BestDistance, SaveSystem.LoadBestDistance());
+        int currencyBalance = economyManager != null ? economyManager.CurrencyBalance : SaveSystem.LoadCurrencyBalance();
+        SaveSystem.SaveProgress(currencyBalance, bestDistance);
+
+        hasPendingRunRewards = false;
     }
 
     bool CanTransition(GameState currentState, GameState nextState)
@@ -112,6 +134,7 @@ public class GameManager : MonoBehaviour
 
         if (nextState == GameState.Riding)
         {
+            hasPendingRunRewards = false;
             runManager.BeginRun();
             return;
         }
@@ -121,5 +144,6 @@ public class GameManager : MonoBehaviour
 
         bool dodgedFallingBike = previousState == GameState.DodgingFallingBike && nextState == GameState.RunComplete;
         runManager.EndRun(dodgedFallingBike);
+        hasPendingRunRewards = true;
     }
 }
