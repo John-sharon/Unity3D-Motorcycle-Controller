@@ -22,6 +22,7 @@ public class RiderFallController : MonoBehaviour
 
     public event Action OnDodgeSucceeded;
     public event Action OnDodgeFailed;
+    public event Action<float> OnDodgeCountdownUpdated;
 
     Rigidbody[] bikerRigidbodies;
     Collider[] bikerColliders;
@@ -29,6 +30,7 @@ public class RiderFallController : MonoBehaviour
 
     bool isDodgeWindowActive;
     float dodgeWindowTimer;
+    bool hasEjected;
 
     void Awake()
     {
@@ -48,6 +50,7 @@ public class RiderFallController : MonoBehaviour
             return;
 
         dodgeWindowTimer -= Time.deltaTime;
+        OnDodgeCountdownUpdated?.Invoke(Mathf.Max(0f, dodgeWindowTimer));
         TryHandleDodgeInput();
 
         if (dodgeWindowTimer > 0f)
@@ -62,14 +65,23 @@ public class RiderFallController : MonoBehaviour
 
     public void BeginEjection()
     {
-        if (isDodgeWindowActive)
+        if (hasEjected)
             return;
+
+        hasEjected = true;
+
+        if (gameManager == null)
+            gameManager = GameManager.Instance;
+
+        if (gameManager != null)
+            gameManager.OnCrashTriggered();
 
         SetRagdollActive(true);
         ApplyEjectionImpulses();
 
         dodgeWindowTimer = dodgeWindowSeconds;
         isDodgeWindowActive = true;
+        OnDodgeCountdownUpdated?.Invoke(dodgeWindowTimer);
     }
 
     public void SetRagdollActive(bool isActive)
@@ -97,7 +109,8 @@ public class RiderFallController : MonoBehaviour
         bikerRigidbodies = bikerParentGameObject.GetComponentsInChildren<Rigidbody>();
         bikerColliders = bikerParentGameObject.GetComponentsInChildren<Collider>();
 
-        if (bikerRigidbodies.Length > 0)
+        riderRootRigidbody = bikerParentGameObject.GetComponent<Rigidbody>();
+        if (riderRootRigidbody == null && bikerRigidbodies.Length > 0)
             riderRootRigidbody = bikerRigidbodies[0];
     }
 

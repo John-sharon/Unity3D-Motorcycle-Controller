@@ -269,9 +269,6 @@ public class MotorcycleController : MonoBehaviour
     {
         if (other.gameObject.CompareTag("Obstacle"))
         {
-            if (gameManager != null)
-                gameManager.OnCrashTriggered();
-
             if (riderFallController != null)
                 riderFallController.BeginEjection();
         }
