@@ -2,26 +2,35 @@ using UnityEngine;
 
 /// <summary>
 /// Dedicated bike-body danger volume used after the rider is ejected.
-/// 
-/// Scene/prefab setup expected by this component:
-/// 1. Attach this script to a dedicated collider on the bike body instead of the main impact collider.
-/// 2. The dedicated collider should normally be configured as a trigger so it can overlap the ragdoll while
-///    the bike keeps using its regular colliders for world collisions. Collision callbacks are also supported,
-///    but trigger-based detection is the intended setup for this project.
-/// 3. Keep the motorcycle rigidbody on the bike root so Unity can generate trigger/collision callbacks while the
-///    falling bike is dynamic.
-/// 4. Tag/layer the rider root consistently (for example tag = Rider, layer = Rider) and tag/layer this danger
-///    volume consistently (for example tag = BikeDanger, layer = BikeDanger).
-/// 5. Rider body-part colliders may live on child bones; this component treats any collider under the configured
-///    rider root as a valid rider hit so you do not need to tag every ragdoll limb individually.
+///
+/// Required setup (scene/prefab):
+/// 1) Attach this component to a dedicated bike-body collider (not the main chassis collider).
+/// 2) Choose detection mode:
+///    - TriggerBased (recommended): set this collider's <see cref="Collider.isTrigger"/> = true.
+///    - CollisionBased: keep this collider non-trigger and allow physical collisions.
+/// 3) Keep a non-kinematic Rigidbody on the falling bike root so Unity produces trigger/collision callbacks.
+/// 4) Configure consistent identifiers:
+///    - Rider root object: tag/layer = Rider.
+///    - Danger collider object: tag/layer = BikeDanger.
+/// 5) Rider ragdoll limb colliders may live on child bones; this script accepts contacts from any child under rider root.
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class BikeDangerCollision : MonoBehaviour
 {
+    enum DetectionMode
+    {
+        TriggerBased,
+        CollisionBased,
+        Both
+    }
+
     [Header("REFERENCES")]
     [SerializeField] Transform riderRoot;
     [SerializeField] Collider riderRootCollider;
     [SerializeField] GameManager gameManager;
+
+    [Header("DETECTION")]
+    [SerializeField] DetectionMode detectionMode = DetectionMode.TriggerBased;
 
     [Header("IDENTIFICATION")]
     [SerializeField] string riderTag = "Rider";
@@ -40,7 +49,7 @@ public class BikeDangerCollision : MonoBehaviour
 
         Collider dangerCollider = GetComponent<Collider>();
         if (dangerCollider != null)
-            dangerCollider.isTrigger = true;
+            dangerCollider.isTrigger = detectionMode != DetectionMode.CollisionBased;
     }
 
     void Awake()
@@ -58,11 +67,17 @@ public class BikeDangerCollision : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
+        if (detectionMode == DetectionMode.CollisionBased)
+            return;
+
         TryHandleRiderContact(other);
     }
 
     void OnCollisionEnter(Collision collision)
     {
+        if (detectionMode == DetectionMode.TriggerBased)
+            return;
+
         TryHandleRiderContact(collision.collider);
     }
 
@@ -81,16 +96,23 @@ public class BikeDangerCollision : MonoBehaviour
             return;
 
         hasRegisteredBikeHit = true;
-        gameManager.OnBikeHitRider();
 
+        // Requirement: call the bike-hit callback and ensure transition to GameOver.
+        gameManager.OnBikeHitRider();
         if (gameManager.CurrentState != GameState.GameOver)
             gameManager.SetState(GameState.GameOver);
     }
 
     bool IsRiderContact(Collider other)
     {
-        if (riderRootCollider != null && other == riderRootCollider)
-            return true;
+        if (riderRootCollider != null)
+        {
+            if (other == riderRootCollider)
+                return true;
+
+            if (other.transform.IsChildOf(riderRootCollider.transform))
+                return true;
+        }
 
         if (riderRoot != null && (other.transform == riderRoot || other.transform.IsChildOf(riderRoot)))
             return true;
@@ -142,9 +164,14 @@ public class BikeDangerCollision : MonoBehaviour
     void ValidateConfiguredSetup()
     {
         Collider dangerCollider = GetComponent<Collider>();
-        if (dangerCollider != null && !dangerCollider.isTrigger)
+        if (dangerCollider == null)
+            return;
+
+        bool expectsTrigger = detectionMode != DetectionMode.CollisionBased;
+        if (dangerCollider.isTrigger != expectsTrigger)
         {
-            Debug.LogWarning($"{nameof(BikeDangerCollision)} on '{name}' is intended to use a trigger collider. Collision callbacks remain supported if you keep it non-trigger.", this);
+            string expected = expectsTrigger ? "true" : "false";
+            Debug.LogWarning($"{nameof(BikeDangerCollision)} on '{name}' expects Collider.isTrigger = {expected} for {detectionMode} mode.", this);
         }
 
         if (bikeDangerLayer >= 0 && gameObject.layer != bikeDangerLayer)
