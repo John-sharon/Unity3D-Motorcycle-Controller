@@ -71,6 +71,8 @@ public class MotorcycleController : MonoBehaviour
         motorcycleRigidbody = GetComponent<Rigidbody>();
         if (gameManager == null)
             gameManager = GameManager.Instance;
+        if (gameManager == null)
+            gameManager = FindObjectOfType<GameManager>();
         if (riderFallController == null)
             riderFallController = GetComponentInChildren<RiderFallController>();
 
@@ -267,18 +269,20 @@ public class MotorcycleController : MonoBehaviour
 
     void OnCollisionEnter(Collision other)
     {
-        if (other.gameObject.CompareTag("Obstacle"))
-        {
-            if (gameManager != null)
-                gameManager.OnCrashTriggered();
+        if (!other.gameObject.CompareTag("Obstacle") || !IsInRidingState())
+            return;
 
-            if (riderFallController != null)
-                riderFallController.BeginEjection();
+        if (gameManager != null)
+            gameManager.OnCrashTriggered();
+
+        if (riderFallController != null)
+        {
+            riderFallController.BeginEjection();
         }
     }
 
     bool IsInRidingState()
     {
-        return gameManager == null || gameManager.CurrentState == GameState.Riding;
+        return gameManager != null && gameManager.CurrentState == GameState.Riding;
     }
 }
