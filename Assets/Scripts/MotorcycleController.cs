@@ -77,8 +77,7 @@ public class MotorcycleController : MonoBehaviour
             gameManager = GameManager.Instance;
         if (gameManager == null)
             gameManager = FindObjectOfType<GameManager>();
-        if (riderFallController == null)
-            riderFallController = GetComponentInChildren<RiderFallController>();
+        ResolveRiderFallController();
 
         ApplyStats(RuntimeBikeStats.FromBase(defaultStats));
         TrySubscribeToGameStateEvents();
@@ -308,10 +307,21 @@ public class MotorcycleController : MonoBehaviour
         if (gameManager == null || gameManager.CurrentState != GameState.Riding)
             return false;
 
+        ResolveRiderFallController();
         if (riderFallController == null)
-            return true;
+            return false;
 
         return riderFallController.CanControlBike;
+    }
+
+    void ResolveRiderFallController()
+    {
+        if (riderFallController != null)
+            return;
+
+        riderFallController = GetComponentInChildren<RiderFallController>();
+        if (riderFallController == null)
+            riderFallController = FindObjectOfType<RiderFallController>();
     }
 
     void HandleGameStateChanged(GameState previousState, GameState nextState)
