@@ -305,7 +305,13 @@ public class MotorcycleController : MonoBehaviour
 
     bool IsInRidingState()
     {
-        return gameManager != null && gameManager.CurrentState == GameState.Riding;
+        if (gameManager == null || gameManager.CurrentState != GameState.Riding)
+            return false;
+
+        if (riderFallController == null)
+            return true;
+
+        return riderFallController.CanControlBike;
     }
 
     void HandleGameStateChanged(GameState previousState, GameState nextState)
