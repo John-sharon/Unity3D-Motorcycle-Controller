@@ -51,6 +51,8 @@ public class MotorcycleController : MonoBehaviour
 
     [Header("GAME FLOW")]
     [SerializeField] GameManager gameManager;
+    [SerializeField, Min(0f)] float crashImmunitySecondsAtRunStart = 1f;
+    [SerializeField, Min(0f)] float minCrashRelativeVelocity = 4f;
 
     float speedDetector;
     float slideValue;
@@ -65,6 +67,8 @@ public class MotorcycleController : MonoBehaviour
     bool isMovingSoundPlaying = false;
     bool isInNeutralSoundPlaying = false;
     bool isbrakingSoundPlaying = false;
+    float runStartedAtTime;
+    bool isSubscribedToGameState;
 
     void Start()
     {
@@ -77,6 +81,18 @@ public class MotorcycleController : MonoBehaviour
             riderFallController = GetComponentInChildren<RiderFallController>();
 
         ApplyStats(RuntimeBikeStats.FromBase(defaultStats));
+        TrySubscribeToGameStateEvents();
+        runStartedAtTime = Time.time;
+    }
+
+    void OnEnable()
+    {
+        TrySubscribeToGameStateEvents();
+    }
+
+    void OnDisable()
+    {
+        UnsubscribeFromGameStateEvents();
     }
 
     void Update()
@@ -272,6 +288,12 @@ public class MotorcycleController : MonoBehaviour
         if (!other.gameObject.CompareTag("Obstacle") || !IsInRidingState())
             return;
 
+        if (Time.time - runStartedAtTime < crashImmunitySecondsAtRunStart)
+            return;
+
+        if (other.relativeVelocity.magnitude < minCrashRelativeVelocity)
+            return;
+
         if (gameManager != null)
             gameManager.OnCrashTriggered();
 
@@ -284,5 +306,35 @@ public class MotorcycleController : MonoBehaviour
     bool IsInRidingState()
     {
         return gameManager != null && gameManager.CurrentState == GameState.Riding;
+    }
+
+    void HandleGameStateChanged(GameState previousState, GameState nextState)
+    {
+        if (nextState == GameState.Riding)
+            runStartedAtTime = Time.time;
+    }
+
+    void TrySubscribeToGameStateEvents()
+    {
+        if (isSubscribedToGameState)
+            return;
+
+        if (gameManager == null)
+            gameManager = GameManager.Instance;
+
+        if (gameManager == null)
+            return;
+
+        gameManager.OnStateChanged += HandleGameStateChanged;
+        isSubscribedToGameState = true;
+    }
+
+    void UnsubscribeFromGameStateEvents()
+    {
+        if (!isSubscribedToGameState || gameManager == null)
+            return;
+
+        gameManager.OnStateChanged -= HandleGameStateChanged;
+        isSubscribedToGameState = false;
     }
 }
