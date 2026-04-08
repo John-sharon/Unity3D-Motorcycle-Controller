@@ -31,6 +31,9 @@ public class RiderFallController : MonoBehaviour
     bool isDodgeWindowActive;
     float dodgeWindowTimer;
     bool hasEjected;
+    bool isSubscribedToGameState;
+
+    public bool CanControlBike => !hasEjected;
 
     void Awake()
     {
@@ -63,6 +66,16 @@ public class RiderFallController : MonoBehaviour
             gameManager.OnBikeHitRider();
     }
 
+    void OnEnable()
+    {
+        TrySubscribeToGameStateEvents();
+    }
+
+    void OnDisable()
+    {
+        UnsubscribeFromGameStateEvents();
+    }
+
     public void BeginEjection()
     {
         if (hasEjected)
@@ -82,6 +95,15 @@ public class RiderFallController : MonoBehaviour
         dodgeWindowTimer = dodgeWindowSeconds;
         isDodgeWindowActive = true;
         OnDodgeCountdownUpdated?.Invoke(dodgeWindowTimer);
+    }
+
+    public void ResetForRespawn()
+    {
+        hasEjected = false;
+        isDodgeWindowActive = false;
+        dodgeWindowTimer = 0f;
+        SetRagdollActive(false);
+        OnDodgeCountdownUpdated?.Invoke(0f);
     }
 
     public void SetRagdollActive(bool isActive)
@@ -157,5 +179,37 @@ public class RiderFallController : MonoBehaviour
 
         if (gameManager != null)
             gameManager.OnDodgeSurvived();
+    }
+
+    void HandleGameStateChanged(GameState previousState, GameState nextState)
+    {
+        if (nextState != GameState.Riding)
+            return;
+
+        ResetForRespawn();
+    }
+
+    void TrySubscribeToGameStateEvents()
+    {
+        if (isSubscribedToGameState)
+            return;
+
+        if (gameManager == null)
+            gameManager = GameManager.Instance;
+
+        if (gameManager == null)
+            return;
+
+        gameManager.OnStateChanged += HandleGameStateChanged;
+        isSubscribedToGameState = true;
+    }
+
+    void UnsubscribeFromGameStateEvents()
+    {
+        if (!isSubscribedToGameState || gameManager == null)
+            return;
+
+        gameManager.OnStateChanged -= HandleGameStateChanged;
+        isSubscribedToGameState = false;
     }
 }
